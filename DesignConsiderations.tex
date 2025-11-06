@@ -1,0 +1,58 @@
+\documentclass[10pt]{article} % use larger type; default would be 10pt
+
+\usepackage[utf8]{inputenc} % set input encoding (not needed with XeLaTeX)
+\usepackage{amsmath} % Pro pokročilejší matematické prostředí
+
+\setlength{\voffset}{-0.65in} % upper border
+\setlength{\hoffset}{-0.65in} % left border
+
+\title{Spiderbot PCB Design Considerations}
+\author{David Strašák}
+%%\date{6.11.2025}
+
+\usepackage[utf8]{inputenc} % Vstupní kódování (pro češtinu)
+\usepackage[czech]{babel}  % Načtení jazykové podpory pro češtinu
+
+\usepackage{csquotes} % Zajišťuje správné uvozovky (požadované babel/polyglossia)
+\usepackage{graphicx}
+\usepackage{float}
+
+\usepackage[
+backend=biber,
+style=numeric, % Změna stylu
+citestyle=numeric
+]{biblatex}
+
+\addbibresource{zdroje.bib}
+
+\begin{document}
+	\maketitle
+	
+	\section{DCDC converter}
+	\subsection{Input capacitor}
+	I choose a ceramic input capacitor with the capacity $10uF$. I found the value recommended in the datasheet and I did not bother to calculate it. Hope it's good.
+	
+	\subsection{Minimum duty cycle}
+	This is needed for the inductor calculation.
+	
+	\begin{equation}
+		D_{min} = \frac{V_{OUT} + V_F}{V_{INMAX} - V_{SW}} = \frac{3.3 + 0.6}{12.6 - 0.6} = 0.31
+	\end{equation}
+	Where $V_F$ is the forward voltage of the diode and $V_{SW}$ is the voltage drop of the MOSFET inside the buck converter (I guess $0.3A\cdot{}200m\Omega$)
+	
+	\subsection{Inductor}
+	I am choosing to have 20\% current ripple from the maximum current of 3A that the converter can supply. That is 0.6A.
+	
+	Then the minimum inductance is:
+	\begin{equation}
+		L_{MIN} = \frac{V_{OUT} + V_F}{\Delta{}I_{MAX}}\cdot\frac{1-D_{MIN}}{F_{SW}} = \frac{3.3+0.6}{0.6}\cdot\frac{1-0.31}{500 000} = 9uH
+	\end{equation}
+	
+	\subsection{Output Capacitor}
+	Once again I would just choose some value to have relatively low ESR with some 22-100uF capacity.
+	
+	
+	
+	\printbibliography
+	
+\end{document}

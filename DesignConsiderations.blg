@@ -1,0 +1,9 @@
+[0] Config.pm:328> INFO - This is Biber 2.21
+[0] Config.pm:331> INFO - Logfile is 'DesignConsiderations.blg'
+[111] biber-MSWIN64:342> INFO - === 
+[153] Biber.pm:421> INFO - Reading 'DesignConsiderations.bcf'
+[242] Biber.pm:1002> INFO - Found 0 citekeys in bib section 0
+[254] bbl.pm:676> INFO - Writing 'DesignConsiderations.bbl' with encoding 'UTF-8'
+[255] bbl.pm:779> INFO - Output to DesignConsiderations.bbl
+[255] Biber.pm:132> WARN - The file 'DesignConsiderations.bcf' does not contain any citations!
+[255] Biber.pm:134> INFO - WARNINGS: 1
