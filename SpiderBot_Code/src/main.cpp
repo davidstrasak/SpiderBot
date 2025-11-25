@@ -40,6 +40,7 @@
 #include <Arduino.h>
 #include <FlexiTimer2.h> //to set a timer to manage all servos
 #include <Servo.h>       //to define and control servos
+#include <Arduino_FreeRTOS.h>
 /* Servos --------------------------------------------------------------------*/
 // define 12 servos for 4 legs
 Servo servo[4][3];
@@ -643,9 +644,6 @@ void head_down(int i) {
  * @param i number of dance cycles to perform
  */
 void body_dance(int i) {
-  float x_tmp;
-  float y_tmp;
-  float z_tmp;
   float body_dance_speed = 2;
   sit();
   move_speed = 1;
