@@ -13,7 +13,7 @@ This robot features:
 - Real-time servo interpolation at 50Hz for smooth motion
 - **Custom PCB** with STM32L412KBT6 microcontroller
 
-![Image of the spiderbot](the_bot.jpg)
+![Image of the bot](the_bot.jpg)
 
 ## 🔧 Hardware
 
