@@ -130,8 +130,10 @@ void setup() {
    // initialize servos
    servo_attach();
    Serial.println("Servos initialized");
+
    // Optional adjust position of the servos
-   adjust();
+   //  adjust();
+
    // initialize default parameter
    set_site(0, x_default - x_offset, y_start + y_step, z_boot);
    set_site(1, x_default - x_offset, y_start + y_step, z_boot);
