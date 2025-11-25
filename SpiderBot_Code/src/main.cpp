@@ -1,36 +1,49 @@
-/* -----------------------------------------------------------------------------
-  - Project: Remote control Crawling robot
-  - Author:  panerqiang@sunfounder.com
-  - Date:  2015/1/27
-   -----------------------------------------------------------------------------
-  - Overview
-  - This project was written for the Crawling robot desigened by Sunfounder.
-    This version of the robot has 4 legs, and each leg is driven by 3 servos.
-  This robot is driven by a Ardunio Nano Board with an expansion Board.
-  We recommend that you view the product documentation before using.
-  - Request
-  - This project requires some library files, which you can find in the head of
-    this file. Make sure you have installed these files.
-  - How to
-  - Before use,you must to adjust the robot,in order to make it more accurate.
-    - Adjustment operation
-    1.uncomment ADJUST, make and run
-    2.comment ADJUST, uncomment VERIFY
-    3.measure real sites and set to real_site[4][3], make and run
-    4.comment VERIFY, make and run
-  The document describes in detail how to operate.
-   ---------------------------------------------------------------------------*/
+/* =============================================================================
+   QUADRUPED CRAWLING ROBOT CONTROL SOFTWARE
+   =============================================================================
 
-   // modified by Regis for spider project, 2015/09/11
+   Project:     Remote Control Crawling Robot
+   Hardware:    Arduino Pro 5V 16MHz with expansion board (perfboard with DC converter and bluetooth)
+                4 legs, 12 servos (3 per leg: coxa, femur, tibia)
 
-   /* Includes ------------------------------------------------------------------*/
-#include <Servo.h>    //to define and control servos
-#include <FlexiTimer2.h>//to set a timer to manage all servos
+   Description:
+   This software controls a quadruped (4-legged) crawling robot. Each leg is
+   actuated by three servos to provide three degrees of freedom. The robot can
+   perform various movements including walking forward/backward, turning left/
+   right, and several demonstration movements like waving and dancing.
+
+   Version History:
+   v1.0 - 2015/01/27 - panerqiang@sunfounder.com
+          Initial release for Sunfounder Crawling Robot
+   v1.1 - 2015/09/11 - Regis
+          Modified for spider project
+   v2.0 - 2025/11/25 - David Strasak
+          Implementation, Code documentation improvements and formatting
+
+   Requirements:
+   - Arduino.h
+   - Servo.h (Arduino servo library)
+   - FlexiTimer2.h (timer interrupt library)
+
+   Calibration Instructions:
+   Before first use, the robot must be calibrated for accurate movement:
+   1. Uncomment ADJUST definition, compile and upload
+   2. Comment ADJUST, uncomment VERIFY definition
+   3. Measure actual servo positions and update real_site[4][3] array
+   4. Comment VERIFY, compile and upload final version
+
+   Refer to product documentation for detailed calibration procedures.
+
+   ============================================================================= */
+
+   /* Includes -------------------------------------------------------------------*/
 #include <Arduino.h>
+#include <FlexiTimer2.h> //to set a timer to manage all servos
+#include <Servo.h>       //to define and control servos
 /* Servos --------------------------------------------------------------------*/
-//define 12 servos for 4 legs
+// define 12 servos for 4 legs
 Servo servo[4][3];
-//define servos' ports - femur, tibia & coxa
+// define servos' ports - femur, tibia & coxa
 const int servo_pin[4][3] = { {3, 4, 2}, {6, 7, 5}, {9, 10, 8}, {12, 13, 11} };
 /* Size of the robot ---------------------------------------------------------*/
 const float length_a = 100;
@@ -44,27 +57,30 @@ const float x_default = 62, x_offset = 0;
 const float y_start = 0, y_step = 40;
 const float y_default = x_default;
 /* variables for movement ----------------------------------------------------*/
-volatile float site_now[4][3];    //real-time coordinates of the end of each leg
-volatile float site_expect[4][3]; //expected coordinates of the end of each leg
-float temp_speed[4][3];   //each axis' speed, needs to be recalculated before each movement
-float move_speed;     //movement speed
-float speed_multiple = 1; //movement speed multiple
+volatile float site_now[4][3]; // real-time coordinates of the end of each leg
+volatile float site_expect[4][3]; // expected coordinates of the end of each leg
+float temp_speed[4][3]; // each axis' speed, needs to be recalculated before
+// each movement
+float move_speed;         // movement speed
+float speed_multiple = 1; // movement speed multiple
 const float spot_turn_speed = 4;
 const float leg_move_speed = 8;
 const float body_move_speed = 3;
 const float stand_seat_speed = 1;
-volatile int rest_counter;      //+1/0.02s, for automatic rest
-//functions' parameter
+volatile int rest_counter; //+1/0.02s, for automatic rest
+// functions' parameter
 const float KEEP = 255;
-//define PI for calculation
+// define PI for calculation
 const float pi = 3.1415926;
 /* Constants for turn --------------------------------------------------------*/
-//temp length
+// temp length
 const float temp_a = sqrt(pow(2 * x_default + length_side, 2) + pow(y_step, 2));
 const float temp_b = 2 * (y_start + y_step) + length_side;
-const float temp_c = sqrt(pow(2 * x_default + length_side, 2) + pow(2 * y_start + y_step + length_side, 2));
-const float temp_alpha = acos((pow(temp_a, 2) + pow(temp_b, 2) - pow(temp_c, 2)) / 2 / temp_a / temp_b);
-//site for turn
+const float temp_c = sqrt(pow(2 * x_default + length_side, 2) +
+  pow(2 * y_start + y_step + length_side, 2));
+const float temp_alpha = acos(
+  (pow(temp_a, 2) + pow(temp_b, 2) - pow(temp_c, 2)) / 2 / temp_a / temp_b);
+// site for turn
 const float turn_x1 = (temp_a - length_side) / 2;
 const float turn_y1 = y_start + y_step / 2;
 const float turn_x0 = turn_x1 - temp_b * cos(temp_alpha);
@@ -91,68 +107,67 @@ void servo_service(void);
 void set_site(int leg, float x, float y, float z);
 void wait_reach(int leg);
 void wait_all_reach(void);
-void cartesian_to_polar(volatile float& alpha, volatile float& beta, volatile float& gamma, volatile float x, volatile float y, volatile float z);
+void cartesian_to_polar(volatile float& alpha, volatile float& beta,
+  volatile float& gamma, volatile float x,
+  volatile float y, volatile float z);
 void polar_to_servo(int leg, float alpha, float beta, float gamma);
 
-/*
-  - setup function
-   ---------------------------------------------------------------------------*/
-void setup()
-{
-  //start serial for debug
+/**
+ * @brief initialize the robot's default parameters, servo service, and servos
+ */
+void setup() {
+  // start serial for debug
   Serial.begin(115200);
   Serial.println("Robot starts initialization");
-  //initialize default parameter
+  // initialize default parameter
   set_site(0, x_default - x_offset, y_start + y_step, z_boot);
   set_site(1, x_default - x_offset, y_start + y_step, z_boot);
   set_site(2, x_default + x_offset, y_start, z_boot);
   set_site(3, x_default + x_offset, y_start, z_boot);
-  for (int i = 0; i < 4; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 3; j++) {
       site_now[i][j] = site_expect[i][j];
     }
   }
-  //start servo service
+  // start servo service
   FlexiTimer2::set(20, servo_service);
   FlexiTimer2::start();
   Serial.println("Servo service started");
-  //initialize servos
+  // initialize servos
   servo_attach();
   Serial.println("Servos initialized");
   Serial.println("Robot initialization Complete");
 }
 
-
-void servo_attach(void)
-{
-  for (int i = 0; i < 4; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
+/**
+ * @brief attach all servos to their pins
+ * @warning blocking function due to delays
+ */
+void servo_attach(void) {
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 3; j++) {
       servo[i][j].attach(servo_pin[i][j]);
       delay(100);
     }
   }
 }
 
-void servo_detach(void)
-{
-  for (int i = 0; i < 4; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
+/**
+ * @brief detach all servos from their pins
+ */
+void servo_detach(void) {
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 3; j++) {
       servo[i][j].detach();
       delay(100);
     }
   }
 }
-/*
-  - loop function
-   ---------------------------------------------------------------------------*/
-void loop()
-{
+/**
+ * @brief main loop demonstrating robot movements and actions
+ * @warning blocking function
+ */
+void loop() {
   Serial.println("Stand");
   stand();
   delay(2000);
@@ -182,48 +197,40 @@ void loop()
   delay(5000);
 }
 
-/*
-  - sit
-  - blocking function
-   ---------------------------------------------------------------------------*/
-void sit(void)
-{
+/**
+ * @brief move robot to sitting position
+ * @warning blocking function
+ */
+void sit(void) {
   move_speed = stand_seat_speed;
-  for (int leg = 0; leg < 4; leg++)
-  {
+  for (int leg = 0; leg < 4; leg++) {
     set_site(leg, KEEP, KEEP, z_boot);
   }
   wait_all_reach();
 }
 
-/*
-  - stand
-  - blocking function
-   ---------------------------------------------------------------------------*/
-void stand(void)
-{
+/**
+ * @brief move robot to standing position
+ * @warning blocking function
+ */
+void stand(void) {
   move_speed = stand_seat_speed;
-  for (int leg = 0; leg < 4; leg++)
-  {
+  for (int leg = 0; leg < 4; leg++) {
     set_site(leg, KEEP, KEEP, z_default);
   }
   wait_all_reach();
 }
 
-
-/*
-  - spot turn to left
-  - blocking function
-  - parameter step steps wanted to turn
-   ---------------------------------------------------------------------------*/
-void turn_left(unsigned int step)
-{
+/**
+ * @brief turn to left
+ * @warning blocking function
+ * @param step steps wanted to turn
+ */
+void turn_left(unsigned int step) {
   move_speed = spot_turn_speed;
-  while (step-- > 0)
-  {
-    if (site_now[3][1] == y_start)
-    {
-      //leg 3&1 move
+  while (step-- > 0) {
+    if (site_now[3][1] == y_start) {
+      // leg 3&1 move
       set_site(3, x_default + x_offset, y_start, z_up);
       wait_all_reach();
 
@@ -254,9 +261,8 @@ void turn_left(unsigned int step)
       set_site(1, x_default + x_offset, y_start, z_default);
       wait_all_reach();
     }
-    else
-    {
-      //leg 0&2 move
+    else {
+      // leg 0&2 move
       set_site(0, x_default + x_offset, y_start, z_up);
       wait_all_reach();
 
@@ -290,19 +296,16 @@ void turn_left(unsigned int step)
   }
 }
 
-/*
-  - spot turn to right
-  - blocking function
-  - parameter step steps wanted to turn
-   ---------------------------------------------------------------------------*/
-void turn_right(unsigned int step)
-{
+/**
+ * @brief turn to right
+ * @warning blocking function
+ * @param step steps wanted to turn
+ */
+void turn_right(unsigned int step) {
   move_speed = spot_turn_speed;
-  while (step-- > 0)
-  {
-    if (site_now[2][1] == y_start)
-    {
-      //leg 2&0 move
+  while (step-- > 0) {
+    if (site_now[2][1] == y_start) {
+      // leg 2&0 move
       set_site(2, x_default + x_offset, y_start, z_up);
       wait_all_reach();
 
@@ -333,9 +336,8 @@ void turn_right(unsigned int step)
       set_site(0, x_default + x_offset, y_start, z_default);
       wait_all_reach();
     }
-    else
-    {
-      //leg 1&3 move
+    else {
+      // leg 1&3 move
       set_site(1, x_default + x_offset, y_start, z_up);
       wait_all_reach();
 
@@ -369,19 +371,16 @@ void turn_right(unsigned int step)
   }
 }
 
-/*
-  - go forward
-  - blocking function
-  - parameter step steps wanted to go
-   ---------------------------------------------------------------------------*/
-void step_forward(unsigned int step)
-{
+/**
+ * @brief move robot forward
+ * @warning blocking function
+ * @param step steps wanted to go
+ */
+void step_forward(unsigned int step) {
   move_speed = leg_move_speed;
-  while (step-- > 0)
-  {
-    if (site_now[2][1] == y_start)
-    {
-      //leg 2&1 move
+  while (step-- > 0) {
+    if (site_now[2][1] == y_start) {
+      // leg 2&1 move
       set_site(2, x_default + x_offset, y_start, z_up);
       wait_all_reach();
       set_site(2, x_default + x_offset, y_start + 2 * y_step, z_up);
@@ -406,9 +405,8 @@ void step_forward(unsigned int step)
       set_site(1, x_default + x_offset, y_start, z_default);
       wait_all_reach();
     }
-    else
-    {
-      //leg 0&3 move
+    else {
+      // leg 0&3 move
       set_site(0, x_default + x_offset, y_start, z_up);
       wait_all_reach();
       set_site(0, x_default + x_offset, y_start + 2 * y_step, z_up);
@@ -436,19 +434,16 @@ void step_forward(unsigned int step)
   }
 }
 
-/*
-  - go back
-  - blocking function
-  - parameter step steps wanted to go
-   ---------------------------------------------------------------------------*/
-void step_back(unsigned int step)
-{
+/**
+ * @brief move robot backward
+ * @warning blocking function
+ * @param step steps wanted to go
+ */
+void step_back(unsigned int step) {
   move_speed = leg_move_speed;
-  while (step-- > 0)
-  {
-    if (site_now[3][1] == y_start)
-    {
-      //leg 3&0 move
+  while (step-- > 0) {
+    if (site_now[3][1] == y_start) {
+      // leg 3&0 move
       set_site(3, x_default + x_offset, y_start, z_up);
       wait_all_reach();
       set_site(3, x_default + x_offset, y_start + 2 * y_step, z_up);
@@ -473,9 +468,8 @@ void step_back(unsigned int step)
       set_site(0, x_default + x_offset, y_start, z_default);
       wait_all_reach();
     }
-    else
-    {
-      //leg 1&2 move
+    else {
+      // leg 1&2 move
       set_site(1, x_default + x_offset, y_start, z_up);
       wait_all_reach();
       set_site(1, x_default + x_offset, y_start + 2 * y_step, z_up);
@@ -503,10 +497,11 @@ void step_back(unsigned int step)
   }
 }
 
-// add by RegisHsu
-
-void body_left(int i)
-{
+/**
+ * @brief shift robot body to the left
+ * @param i distance to shift
+ */
+void body_left(int i) {
   set_site(0, site_now[0][0] + i, KEEP, KEEP);
   set_site(1, site_now[1][0] + i, KEEP, KEEP);
   set_site(2, site_now[2][0] - i, KEEP, KEEP);
@@ -514,8 +509,11 @@ void body_left(int i)
   wait_all_reach();
 }
 
-void body_right(int i)
-{
+/**
+ * @brief shift robot body to the right
+ * @param i distance to shift
+ */
+void body_right(int i) {
   set_site(0, site_now[0][0] - i, KEEP, KEEP);
   set_site(1, site_now[1][0] - i, KEEP, KEEP);
   set_site(2, site_now[2][0] + i, KEEP, KEEP);
@@ -523,21 +521,22 @@ void body_right(int i)
   wait_all_reach();
 }
 
-void hand_wave(int i)
-{
+/**
+ * @brief wave one hand (leg 2 or 0 depending on position)
+ * @param i number of waves to perform
+ */
+void hand_wave(int i) {
   float x_tmp;
   float y_tmp;
   float z_tmp;
   move_speed = 1;
-  if (site_now[3][1] == y_start)
-  {
+  if (site_now[3][1] == y_start) {
     body_right(15);
     x_tmp = site_now[2][0];
     y_tmp = site_now[2][1];
     z_tmp = site_now[2][2];
     move_speed = body_move_speed;
-    for (int j = 0; j < i; j++)
-    {
+    for (int j = 0; j < i; j++) {
       set_site(2, turn_x1, turn_y1, 50);
       wait_all_reach();
       set_site(2, turn_x0, turn_y0, 50);
@@ -548,15 +547,13 @@ void hand_wave(int i)
     move_speed = 1;
     body_left(15);
   }
-  else
-  {
+  else {
     body_left(15);
     x_tmp = site_now[0][0];
     y_tmp = site_now[0][1];
     z_tmp = site_now[0][2];
     move_speed = body_move_speed;
-    for (int j = 0; j < i; j++)
-    {
+    for (int j = 0; j < i; j++) {
       set_site(0, turn_x1, turn_y1, 50);
       wait_all_reach();
       set_site(0, turn_x0, turn_y0, 50);
@@ -569,21 +566,22 @@ void hand_wave(int i)
   }
 }
 
-void hand_shake(int i)
-{
+/**
+ * @brief shake one hand (leg 2 or 0 depending on position) up and down
+ * @param i number of shakes to perform
+ */
+void hand_shake(int i) {
   float x_tmp;
   float y_tmp;
   float z_tmp;
   move_speed = 1;
-  if (site_now[3][1] == y_start)
-  {
+  if (site_now[3][1] == y_start) {
     body_right(15);
     x_tmp = site_now[2][0];
     y_tmp = site_now[2][1];
     z_tmp = site_now[2][2];
     move_speed = body_move_speed;
-    for (int j = 0; j < i; j++)
-    {
+    for (int j = 0; j < i; j++) {
       set_site(2, x_default - 30, y_start + 2 * y_step, 55);
       wait_all_reach();
       set_site(2, x_default - 30, y_start + 2 * y_step, 10);
@@ -594,15 +592,13 @@ void hand_shake(int i)
     move_speed = 1;
     body_left(15);
   }
-  else
-  {
+  else {
     body_left(15);
     x_tmp = site_now[0][0];
     y_tmp = site_now[0][1];
     z_tmp = site_now[0][2];
     move_speed = body_move_speed;
-    for (int j = 0; j < i; j++)
-    {
+    for (int j = 0; j < i; j++) {
       set_site(0, x_default - 30, y_start + 2 * y_step, 55);
       wait_all_reach();
       set_site(0, x_default - 30, y_start + 2 * y_step, 10);
@@ -615,8 +611,12 @@ void hand_shake(int i)
   }
 }
 
-void head_up(int i)
-{
+/**
+ * @brief tilt robot body upward (front legs down, back legs up)
+ * @param i amount to tilt
+ * @warning blocking function
+ */
+void head_up(int i) {
   set_site(0, KEEP, KEEP, site_now[0][2] - i);
   set_site(1, KEEP, KEEP, site_now[1][2] + i);
   set_site(2, KEEP, KEEP, site_now[2][2] - i);
@@ -624,8 +624,12 @@ void head_up(int i)
   wait_all_reach();
 }
 
-void head_down(int i)
-{
+/**
+ * @brief tilt robot body downward (front legs up, back legs down)
+ * @param i amount to tilt
+ * @warning blocking function
+ */
+void head_down(int i) {
   set_site(0, KEEP, KEEP, site_now[0][2] + i);
   set_site(1, KEEP, KEEP, site_now[1][2] - i);
   set_site(2, KEEP, KEEP, site_now[2][2] + i);
@@ -633,8 +637,12 @@ void head_down(int i)
   wait_all_reach();
 }
 
-void body_dance(int i)
-{
+/**
+ * @brief perform a dance routine with increasing speed
+ * @warning blocking function
+ * @param i number of dance cycles to perform
+ */
+void body_dance(int i) {
   float x_tmp;
   float y_tmp;
   float z_tmp;
@@ -646,7 +654,7 @@ void body_dance(int i)
   set_site(2, x_default, y_default, KEEP);
   set_site(3, x_default, y_default, KEEP);
   wait_all_reach();
-  //stand();
+  // stand();
   set_site(0, x_default, y_default, z_default - 20);
   set_site(1, x_default, y_default, z_default - 20);
   set_site(2, x_default, y_default, z_default - 20);
@@ -654,8 +662,7 @@ void body_dance(int i)
   wait_all_reach();
   move_speed = body_dance_speed;
   head_up(30);
-  for (int j = 0; j < i; j++)
-  {
+  for (int j = 0; j < i; j++) {
     if (j > i / 4)
       move_speed = body_dance_speed * 2;
     if (j > i / 2)
@@ -675,43 +682,44 @@ void body_dance(int i)
   head_down(30);
 }
 
-
-/*
-  - microservos service /timer interrupt function/50Hz
-  - when set site expected,this function move the end point to it in a straight line
-  - temp_speed[4][3] should be set before set expect site,it make sure the end point
-   move in a straight line,and decide move speed.
-   ---------------------------------------------------------------------------*/
+/**
+ * @brief servo service routine called by timer interrupt at 50Hz
+ * @warning moves the end point to expected site in a straight line
+ * @note temp_speed[4][3] should be set before setting expect site to ensure the
+ * end point moves in a straight line and to determine move speed
+ */
 #define E_DELTA 0.01
-void servo_service(void)
-{
+void servo_service(void) {
   sei();
   static float alpha, beta, gamma;
 
-  for (int i = 0; i < 4; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
-      if (abs(site_now[i][j] - site_expect[i][j]) < (abs(temp_speed[i][j]) + E_DELTA))
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 3; j++) {
+      if (abs(site_now[i][j] - site_expect[i][j]) <
+        (abs(temp_speed[i][j]) + E_DELTA))
         site_now[i][j] = site_expect[i][j];
       else
         site_now[i][j] += temp_speed[i][j];
     }
 
-    cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
+    cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1],
+      site_now[i][2]);
     polar_to_servo(i, alpha, beta, gamma);
   }
 
   rest_counter++;
 }
 
-/*
-  - set one of end points' expect site
-  - this founction will set temp_speed[4][3] at same time
-  - non - blocking function
-   ---------------------------------------------------------------------------*/
-void set_site(int leg, float x, float y, float z)
-{
+/**
+ * @brief set one of the end points' expected site
+ * @warning non-blocking function
+ * @param leg leg number (0-3)
+ * @param x x coordinate (use KEEP to maintain current value)
+ * @param y y coordinate (use KEEP to maintain current value)
+ * @param z z coordinate (use KEEP to maintain current value)
+ * @note this function will set temp_speed[4][3] at the same time
+ */
+void set_site(int leg, float x, float y, float z) {
   float length_x = 0, length_y = 0, length_z = 0;
 
   if (x != KEEP)
@@ -735,12 +743,12 @@ void set_site(int leg, float x, float y, float z)
     site_expect[leg][2] = z;
 }
 
-/*
-  - wait one of end points move to expect site
-  - blocking function
-   ---------------------------------------------------------------------------*/
-void wait_reach(int leg)
-{
+/**
+ * @brief wait for one end point to reach expected site
+ * @warning blocking function
+ * @param leg leg number (0-3)
+ */
+void wait_reach(int leg) {
   while (1)
     if (site_now[leg][0] == site_expect[leg][0])
       if (site_now[leg][1] == site_expect[leg][1])
@@ -748,63 +756,70 @@ void wait_reach(int leg)
           break;
 }
 
-/*
-  - wait all of end points move to expect site
-  - blocking function
-   ---------------------------------------------------------------------------*/
-void wait_all_reach(void)
-{
+/**
+ * @brief wait for all end points to reach expected sites
+ * @warning blocking function
+ */
+void wait_all_reach(void) {
   for (int i = 0; i < 4; i++)
     wait_reach(i);
 }
 
-/*
-  - trans site from cartesian to polar
-  - mathematical model 2/2
-   ---------------------------------------------------------------------------*/
-void cartesian_to_polar(volatile float& alpha, volatile float& beta, volatile float& gamma, volatile float x, volatile float y, volatile float z)
-{
-  //calculate w-z degree
+/**
+ * @brief transform site from cartesian to polar coordinates
+ * @param alpha output angle for first servo
+ * @param beta output angle for second servo
+ * @param gamma output angle for third servo
+ * @param x cartesian x coordinate
+ * @param y cartesian y coordinate
+ * @param z cartesian z coordinate
+ * @note mathematical model 2/2
+ */
+void cartesian_to_polar(volatile float& alpha, volatile float& beta,
+  volatile float& gamma, volatile float x,
+  volatile float y, volatile float z) {
+  // calculate w-z degree
   float v, w;
   w = (x >= 0 ? 1 : -1) * (sqrt(pow(x, 2) + pow(y, 2)));
   v = w - length_c;
-  alpha = atan2(z, v) + acos((pow(length_a, 2) - pow(length_b, 2) + pow(v, 2) + pow(z, 2)) / 2 / length_a / sqrt(pow(v, 2) + pow(z, 2)));
-  beta = acos((pow(length_a, 2) + pow(length_b, 2) - pow(v, 2) - pow(z, 2)) / 2 / length_a / length_b);
-  //calculate x-y-z degree
+  alpha = atan2(z, v) +
+    acos((pow(length_a, 2) - pow(length_b, 2) + pow(v, 2) + pow(z, 2)) /
+      2 / length_a / sqrt(pow(v, 2) + pow(z, 2)));
+  beta = acos((pow(length_a, 2) + pow(length_b, 2) - pow(v, 2) - pow(z, 2)) /
+    2 / length_a / length_b);
+  // calculate x-y-z degree
   gamma = (w >= 0) ? atan2(y, x) : atan2(-y, -x);
-  //trans degree pi->180
+  // trans degree pi->180
   alpha = alpha / pi * 180;
   beta = beta / pi * 180;
   gamma = gamma / pi * 180;
 }
 
-/*
-  - trans site from polar to microservos
-  - mathematical model map to fact
-  - the errors saved in eeprom will be add
-   ---------------------------------------------------------------------------*/
-void polar_to_servo(int leg, float alpha, float beta, float gamma)
-{
-  if (leg == 0)
-  {
+/**
+ * @brief transform site from polar coordinates to servo angles
+ * @param leg leg number (0-3)
+ * @param alpha first servo angle
+ * @param beta second servo angle
+ * @param gamma third servo angle
+ * @note mathematical model mapped to physical implementation
+ */
+void polar_to_servo(int leg, float alpha, float beta, float gamma) {
+  if (leg == 0) {
     alpha = 90 - alpha;
     beta = beta;
     gamma += 90;
   }
-  else if (leg == 1)
-  {
+  else if (leg == 1) {
     alpha += 90;
     beta = 180 - beta;
     gamma = 90 - gamma;
   }
-  else if (leg == 2)
-  {
+  else if (leg == 2) {
     alpha += 90;
     beta = 180 - beta;
     gamma = 90 - gamma;
   }
-  else if (leg == 3)
-  {
+  else if (leg == 3) {
     alpha = 90 - alpha;
     beta = beta;
     gamma += 90;
