@@ -640,9 +640,6 @@ void head_down(int i) {
  * @param i number of dance cycles to perform
  */
 void body_dance(int i) {
-   float x_tmp;
-   float y_tmp;
-   float z_tmp;
    float body_dance_speed = 2;
    sit();
    move_speed = 1;
