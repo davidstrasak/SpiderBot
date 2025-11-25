@@ -42,6 +42,7 @@
 #include <Arduino.h>
 #include <FlexiTimer2.h>  //to set a timer to manage all servos
 #include <Servo.h>        //to define and control servos
+#include <avr/io.h>       //to read how much memory is left
 /* Servos --------------------------------------------------------------------*/
 // define 12 servos for 4 legs
 Servo servo[4][3];
@@ -114,17 +115,8 @@ void cartesian_to_polar(volatile float& alpha, volatile float& beta,
                         volatile float& gamma, volatile float x,
                         volatile float y, volatile float z);
 void polar_to_servo(int leg, float alpha, float beta, float gamma);
-
-void adjust(void) {
-   while (1) {
-      for (int i = 0; i < 4; i++) {
-         for (int j = 0; j < 3; j++) {
-            servo[i][j].write(90);
-            delay(20);
-         }
-      }
-   }
-}
+int freeMemory(void);
+void adjust(void);
 
 /**
  * @brief initialize the robot's default parameters, servo service, and servos
@@ -133,6 +125,8 @@ void setup() {
    // start serial for debug
    Serial.begin(115200);
    Serial.println("Robot starts initialization");
+   Serial.print("Free RAM (Start): ");
+   Serial.println(freeMemory());
    // initialize servos
    servo_attach();
    Serial.println("Servos initialized");
@@ -153,6 +147,8 @@ void setup() {
    FlexiTimer2::start();
    Serial.println("Servo service started");
    Serial.println("Robot initialization Complete");
+   Serial.print("Free RAM (End of setup): ");
+   Serial.println(freeMemory());  // About 1367 left after setup
 }
 
 /**
@@ -822,4 +818,39 @@ void polar_to_servo(int leg, float alpha, float beta, float gamma) {
    servo[leg][0].write(alpha);
    servo[leg][1].write(beta);
    servo[leg][2].write(gamma);
+}
+
+/**
+ * @brief Calculates and returns the available free SRAM in bytes.
+ * Works by measuring the space between the Hardware Stack Pointer (SP)
+ * and the end of the Heap (__brkval or __malloc_heap_end).
+ * @return int: Number of free bytes.
+ */
+int freeMemory() {
+   extern int __heap_start, *__brkval;
+   int v;
+   // If __brkval is NULL, the heap hasn't grown yet; use the heap start address
+   if ((int)__brkval == 0) {
+      return (int)&v - (int)&__heap_start;
+   }
+   // Otherwise, calculate the space between the current stack (address of v)
+   // and the end of the heap (__brkval).
+   else {
+      return (int)&v - (int)__brkval;
+   }
+}
+
+/**
+ * @brief Inifinite loop function to adjust legs to correct positions.
+ * @note Comment out this function if you want to use the spiderbot
+ */
+void adjust(void) {
+   while (1) {
+      for (int i = 0; i < 4; i++) {
+         for (int j = 0; j < 3; j++) {
+            servo[i][j].write(90);
+            delay(20);
+         }
+      }
+   }
 }
