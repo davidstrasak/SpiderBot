@@ -115,6 +115,17 @@ void cartesian_to_polar(volatile float& alpha, volatile float& beta,
                         volatile float y, volatile float z);
 void polar_to_servo(int leg, float alpha, float beta, float gamma);
 
+void adjust(void) {
+   while (1) {
+      for (int i = 0; i < 4; i++) {
+         for (int j = 0; j < 3; j++) {
+            servo[i][j].write(90);
+            delay(20);
+         }
+      }
+   }
+}
+
 /**
  * @brief initialize the robot's default parameters, servo service, and servos
  */
@@ -122,6 +133,11 @@ void setup() {
    // start serial for debug
    Serial.begin(115200);
    Serial.println("Robot starts initialization");
+   // initialize servos
+   servo_attach();
+   Serial.println("Servos initialized");
+   // Optional adjust position of the servos
+   adjust();
    // initialize default parameter
    set_site(0, x_default - x_offset, y_start + y_step, z_boot);
    set_site(1, x_default - x_offset, y_start + y_step, z_boot);
@@ -136,9 +152,6 @@ void setup() {
    FlexiTimer2::set(20, servo_service);
    FlexiTimer2::start();
    Serial.println("Servo service started");
-   // initialize servos
-   servo_attach();
-   Serial.println("Servos initialized");
    Serial.println("Robot initialization Complete");
 }
 
